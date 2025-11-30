@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Mini WebUI — Ollama</title>
+
+<style>
+  body {
+    font-family: Arial;
+    padding: 2rem;
+    background: #f5f5f5;
+    position: relative;
+  }
+
+  #credits {
+    position: absolute;
+    top: 20px;
+    right: 30px;
+    text-align: right;
+    font-size: 13px;
+    color: #444;
+    line-height: 1.3;
+  }
+
+  #chat {
+    border: 1px solid #ccc;
+    padding: 1rem;
+    background: white;
+    height: 300px;
+    overflow-y: auto;
+    margin-top: 10px;
+  }
+
+  textarea { width: 100%; height: 80px; margin-top: 10px; }
+
+  button { padding: 10px 20px; margin-top: 10px; }
+
+  select { padding: 6px; margin-bottom: 10px; }
+
+  #modelInfo {
+    background: white;
+    padding: 10px;
+    border: 1px solid #ccc;
+    margin-bottom: 8px;
+  }
+
+  #shortToggle,
+  #spanishToggle {
+    padding: 6px 10px;
+    font-size: 12px;
+    background: #ddd;
+    cursor: pointer;
+  }
+
+  .active {
+    background: #4caf50 !important;
+    color: white !important;
+  }
+</style>
+</head>
+
+<body>
+
+<h2>Mini WebUI — Ollama</h2>
+
+<div id="credits">
+  <strong>Rommel Contreras</strong><br>
+  <a href="https://tecnologiacumanesa.blogspot.com/" target="_blank">
+    Ciencia-tecnología e historia
+  </a><br>
+  <span style="font-size:11px; color:#666; font-style:italic;">Licencia MIT</span>
+</div>
+
+<label>Modelo:</label>
+<select id="modelSelect"></select>
+
+<button id="shortToggle">Modo respuesta corta</button>
+
+<!-- NUEVO: BOTÓN FORZAR CASTELLANO -->
+<button id="spanishToggle">Forzar castellano</button>
+
+<div id="modelInfo">
+  <b>Parámetros:</b> <span id="p_params">—</span><br>
+  <b>Tamaño:</b> <span id="p_size">—</span><br>
+  <b>Quantization:</b> <span id="p_quant">—</span><br>
+  <b>Promedio latencia 1er token:</b> <span id="p_latency">—</span>
+</div>
+
+<div id="chat"></div>
+
+<textarea id="prompt" placeholder="Escribe tu mensaje..."></textarea>
+
+<button onclick="send()">Enviar</button>
+<button onclick="stopStreaming()" style="background:#c62828;color:white;">Detener</button>
+<button onclick="clearHistory()">Limpiar historial</button>
+<button onclick="openHelp()">Ayuda</button>
+
+
+<!-- =================== AYUDA =================== -->
+<div id="helpModal"
+     style="display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+            background:rgba(0,0,0,0.6); backdrop-filter:blur(2px);">
+  <div style="background:white; width:60%; margin:5% auto; padding:20px;
+              border-radius:8px; max-height:80%; overflow-y:auto;">
+
+    <h2>Ayuda — Mini WebUI Ollama</h2>
+
+    <p><b>1. Ejecutar Ollama en WSL</b></p>
+    <p>Instala y activa Ollama dentro de tu distribución WSL (Ubuntu, Debian, etc.):</p>
+    <pre>
+curl -fsSL https://ollama.com/install.sh | sh
+ollama serve
+    </pre>
+    <p>Este comando deja a Ollama escuchando en el puerto <code>11434</code>, accesible desde Windows.</p>
+
+    <p><b>2. Probar Ollama desde Windows</b></p>
+    <p>Puedes verificar que el servidor Ollama responde ejecutando:</p>
+    <pre>
+curl http://localhost:11434/api/generate -d ^
+ "{ \"model\": \"gemma3:4b\", \"prompt\": \"hola\" }"
+    </pre>
+
+    <p><b>3. Ejecutar esta WebUI</b></p>
+    <p>Para evitar bloqueos de seguridad del navegador (CORS y bloqueo de archivos locales), debes iniciar un servidor web simple:</p>
+
+<pre>python -m http.server 8000</pre>
+
+    <p>Luego abre en tu navegador:</p>
+<pre>http://localhost:8000</pre>
+
+    <p><b>4. ¿Por qué es necesario usar un servidor web?</b></p>
+    <ul>
+      <li>Chrome y Edge NO permiten que un archivo local (<code>index.html</code>) haga peticiones a <code>http://localhost:11434</code> por razones de seguridad (CORS y Mixed Content).</li>
+      <li>Firefox sí permite peticiones desde archivos locales <b>pero</b> bloquea algunas lecturas de streaming.</li>
+      <li>La forma 100% compatible es usar <b>un servidor web local</b> (como el de Python).</li>
+    </ul>
+
+    <p><b>5. Navegadores compatibles</b></p>
+    <ul>
+      <li><b>Chrome</b>: funciona perfectamente si usas <code>http.server</code>.</li>
+      <li><b>Firefox</b>: puede funcionar incluso sin servidor, pero se recomienda usar el servidor para evitar fallos de streaming.</li>
+      <li><b>Edge</b>: igual que Chrome, requiere servidor web.</li>
+    </ul>
+
+    <p><b>6. Características de esta interfaz</b></p>
+    <ul>
+      <li>Selector de modelos instalados en Ollama.</li>
+      <li>Actualización automática de:
+        <ul>
+          <li>Parámetros</li>
+          <li>Tamaño en disco</li>
+          <li>Quantization (Q4, Q5, etc.)</li>
+          <li>Latencia promedio del primer token</li>
+        </ul>
+      </li>
+      <li>Streaming en tiempo real.</li>
+      <li>Botón para detener la respuesta.</li>
+      <li>Botón para limpiar historial.</li>
+      <li>Modo “respuesta corta” (menos de 10 palabras).</li>
+      <li>Modo “forzar castellano”.</li>
+      <li>Totalmente offline una vez instalados los modelos.</li>
+      <li>Funciona en Windows, Linux, WSL y macOS.</li>
+    </ul>
+
+    <p><b>7. Notas importantes</b></p>
+    <ul>
+      <li>La API de Ollama siempre corre en <code>http://localhost:11434</code>.</li>
+      <li>Si usas WSL, debes ejecutar <code>ollama serve</code> dentro de WSL.</li>
+      <li><b>NO</b> ejecutes Ollama en Windows y WSL al mismo tiempo (causa conflicto en el puerto).</li>
+      <li>WSL debe estar configurado para permitir tráfico hacia Windows (por defecto ya lo permite).</li>
+    </ul>
+
+    <button onclick="closeHelp()"
+            style="margin-top:15px; padding:10px 20px;">
+      Cerrar
+    </button>
+
+  </div>
+</div>
+
+
+
+<script>
+const API = "http://localhost:11434";
+let times = [];
+let currentController = null;
+let isStreaming = false;
+
+// ==============================
+// Alternadores simples
+// ==============================
+let shortMode = false;
+let spanishMode = false;
+
+document.getElementById("shortToggle").onclick = () => {
+  shortMode = !shortMode;
+  document.getElementById("shortToggle").classList.toggle("active");
+};
+
+document.getElementById("spanishToggle").onclick = () => {
+  spanishMode = !spanishMode;
+  document.getElementById("spanishToggle").classList.toggle("active");
+};
+
+// ==============================
+// Cargar modelos
+// ==============================
+async function loadModels() {
+  try {
+    const resp = await fetch(API + "/api/tags");
+    const data = await resp.json();
+
+    const select = document.getElementById("modelSelect");
+    select.innerHTML = "";
+
+    data.models.forEach(m => {
+      const opt = document.createElement("option");
+      opt.value = m.name;
+      opt.innerText = m.name;
+      select.appendChild(opt);
+    });
+
+    loadModelInfo();
+  } catch (err) {
+    alert("Error cargando modelos: " + err);
+  }
+}
+
+document.getElementById("modelSelect").addEventListener("change", loadModelInfo);
+loadModels();
+
+
+// ==============================
+// Cargar info del modelo (FUNCIONAL)
+// ==============================
+async function loadModelInfo() {
+  const modelName = document.getElementById("modelSelect").value;
+  if (!modelName) return;
+
+  try {
+    const resp = await fetch(API + "/api/tags");
+    const data = await resp.json();
+
+    const tag = (data.models || []).find(m => m.name === modelName);
+
+    document.getElementById("p_params").innerText =
+      tag?.details?.parameter_size ?? "—";
+
+    document.getElementById("p_size").innerText =
+      tag?.size ? (tag.size / (1024 ** 3)).toFixed(2) + " GB" : "—";
+
+    const quant = tag?.details?.quantization_level ?? "—";
+
+    let explanation = "Cuantización desconocida";
+    if (quant.startsWith("Q4")) explanation = "4 bits por peso, método K (rápido y eficiente)";
+    if (quant.startsWith("Q5")) explanation = "5 bits, mejor calidad, más consumo";
+    if (quant.startsWith("Q6")) explanation = "6 bits, alta calidad";
+    if (quant.startsWith("Q8")) explanation = "8 bits, máxima calidad";
+
+    document.getElementById("p_quant").innerHTML =
+      `${quant} <small>[${explanation}]</small>`;
+
+    if (times.length > 0) {
+      const avg = (times.reduce((a,b)=>a+b,0)/times.length).toFixed(2);
+      document.getElementById("p_latency").innerText = avg + " s";
+    } else {
+      document.getElementById("p_latency").innerText = "—";
+    }
+  } catch (err) {
+    console.error("Error leyendo info modelo", err);
+  }
+}
+
+
+// ==============================
+// Chat
+// ==============================
+function addToChat(sender, text) {
+  const chat = document.getElementById("chat");
+  chat.innerHTML += `<p><b>${sender}:</b> ${text}</p>`;
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function stopStreaming() {
+  if (currentController) {
+    currentController.abort();
+    isStreaming = false;
+    currentController = null;
+  }
+}
+
+async function send() {
+  let prompt = document.getElementById("prompt").value.trim();
+  if (!prompt) return;
+
+  if (shortMode)
+    prompt = "Responde en MENOS de 10 palabras: " + prompt;
+
+  if (spanishMode)
+    prompt = "Responde SIEMPRE en castellano. " + prompt;
+
+  const model = document.getElementById("modelSelect").value;
+  addToChat("Tú", prompt);
+  document.getElementById("prompt").value = "";
+
+  stopStreaming();
+  currentController = new AbortController();
+  const signal = currentController.signal;
+  isStreaming = true;
+
+  addToChat(model, "…");
+  const answerTag = document.getElementById("chat").lastElementChild;
+
+  let finalText = "";
+  let t0 = performance.now();
+  let firstTokenTime = null;
+
+  try {
+    const resp = await fetch(API + "/api/generate", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ model, prompt, stream:true }),
+      signal
+    });
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value);
+      const lines = chunk.trim().split("\n");
+
+      for (let line of lines) {
+        try {
+          const obj = JSON.parse(line);
+          if (obj.response) {
+            if (firstTokenTime === null)
+              firstTokenTime = ((performance.now() - t0)/1000).toFixed(2);
+
+            finalText += obj.response;
+            answerTag.innerHTML =
+              `<b>${model} (${firstTokenTime}s):</b> ${finalText}`;
+          }
+        } catch {}
+      }
+    }
+
+  } catch (err) {
+    answerTag.innerHTML = `<b>${model}:</b> [detenido]`;
+  }
+
+  if (firstTokenTime) {
+    times.push(parseFloat(firstTokenTime));
+    loadModelInfo();
+  }
+
+  isStreaming = false;
+}
+
+// ==============================
+// Limpiar historial
+// ==============================
+function clearHistory() {
+  times = [];
+  document.getElementById("chat").innerHTML = "";
+  document.getElementById("p_latency").innerText = "—";
+}
+
+// ==============================
+// Ayuda
+// ==============================
+function openHelp() { document.getElementById("helpModal").style.display = "block"; }
+function closeHelp() { document.getElementById("helpModal").style.display = "none"; }
+
+</script>
+
+</body>
+</html>
