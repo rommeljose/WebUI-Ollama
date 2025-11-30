@@ -29,13 +29,94 @@ Toda la lógica está implementada en un único archivo `index.html`.
 
 ## 📦 Requisitos del sistema
 
-### Windows
-- Windows 10 / 11
-- WSL (Ubuntu recomendado)
-- Python 3
-- Navegador (Chrome/Edge requiere servidor; Firefox puede abrir localmente)
+## 🖥️ Requisitos del sistema (Windows)
+
+- 🪟 **Windows 10 / 11**  
+- 🐧 **WSL** (Ubuntu recomendado)  
+- 🐍 **Python 3**  
+- 🌐 **Navegador web compatible:**  
+  - 🦊 **Firefox** → Permite abrir `index.html` directamente *(sin servidor)*  
+  - 🌐 **Chrome / Edge** → Requieren servidor local *(por políticas de seguridad)*  
 
 ---
+
+## ❓ ¿Por qué Chrome y Edge necesitan un servidor Python?
+
+Chrome y Edge **bloquean por razones de seguridad** cualquier intento de usar `fetch()` desde un archivo abierto localmente:
+
+```
+file://C:/ruta/index.html
+```
+
+cuando intenta comunicarse con:
+
+```
+http://localhost:11434     ← donde corre Ollama
+```
+
+Este bloqueo forma parte de las reglas del navegador conocidas como:
+
+### 🔒 CORS + Same-Origin Policy
+
+Estas políticas impiden que un archivo HTML local trate de hacer solicitudes HTTP a un origen distinto del suyo.  
+Por eso obtienes el error:
+
+```
+TypeError: Failed to fetch
+```
+
+**No es un fallo de tu WebUI.**  
+Es una protección del navegador.
+
+---
+
+## ✅ Solución: usar un servidor Python local
+
+Chrome y Edge permiten solicitudes HTTP **solo si la página fue servida por un servidor real**, aunque sea local.
+
+La forma más simple es:
+
+```bash
+python3 -m http.server 8000
+```
+
+Esto expone tus archivos en:
+
+```
+http://localhost:8000
+```
+
+Ahora sí tu WebUI puede comunicarse con:
+
+```
+http://localhost:11434   ← API de Ollama
+```
+
+Y todo funciona perfectamente.
+
+---
+
+## 📝 Resumen rápido
+
+| Navegador | ¿Puede abrir index.html sin servidor? | Motivo |
+|----------|----------------------------------------|--------|
+| 🦊 **Firefox** | ✔️ Sí | Políticas menos estrictas para `file://` |
+| 🌐 **Chrome**  | ❌ No | Bloqueo CORS/Same-Origin |
+| 🟦 **Edge**    | ❌ No | Bloqueo CORS/Same-Origin |
+
+---
+
+## 💡 Nota Final
+
+El servidor Python **solo entrega archivos estáticos**.  
+No ejecuta código, no procesa la lógica.  
+
+Toda la inteligencia ocurre en:
+
+- 🧠 **Ollama corriendo en WSL**
+- ⚙️ **API local: `http://localhost:11434`**
+- 🖥️ **Tu WebUI HTML (index.html)**
+
 
 ## 🐧 Instalación de WSL
 
@@ -60,7 +141,7 @@ http://localhost:11434
 
 ---
 
-## 📥 Descargar modelos
+## 📥 Descargar modelos (el que le guste, o varios de ellos)
 
 ```bash
 ollama pull gemma3:4b
